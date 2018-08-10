@@ -1,12 +1,19 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace PsnPkgCheck
 {
-    class Program
+    internal static class Program
     {
-        static void Main(string[] args)
+        internal static async Task Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            if (args.Length == 0)
+            {
+                Console.WriteLine("Drag .pkg files or a folder onto this .exe to verify the packages.");
+                return;
+            }
+
+
         }
     }
 }
