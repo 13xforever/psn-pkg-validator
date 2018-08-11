@@ -20,7 +20,7 @@ namespace PsnPkgCheck
             {
                 if (args.Length == 0)
                 {
-                    Console.WriteLine("Drag .pkg files or a folder onto this .exe to verify the packages.");
+                    Console.WriteLine("Drag .pkg files and/or folders onto this .exe to verify the packages.");
                     return;
                 }
 
@@ -101,12 +101,12 @@ namespace PsnPkgCheck
                 await PkgChecker.CheckAsync(pkgList, longestFilename, sigWidth, csumWidth, cts.Token).ConfigureAwait(false);
                 cts.Cancel(false);
                 t.Join();
-                Console.Title = Title;
-                Console.WriteLine("Press any key to exit");
-                Console.ReadKey();
             }
             finally
             {
+                Console.Title = Title;
+                Console.WriteLine("Press any key to exit");
+                Console.ReadKey();
                 Console.WriteLine();
                 Console.CursorVisible = true;
             }
