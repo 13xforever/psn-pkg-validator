@@ -31,15 +31,22 @@ namespace PsnPkgCheck
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 foreach (var item in args)
                 {
-                    if (File.Exists(item))
-                        pkgList.Add(new FileInfo(item));
-                    else if (Directory.Exists(item))
-                        pkgList.AddRange(GetFilepaths(item, "*.pkg", SearchOption.AllDirectories).Select(p => new FileInfo(p)));
+                    var path = item.Trim('"');
+                    if (File.Exists(path))
+                        pkgList.Add(new FileInfo(path));
+                    else if (Directory.Exists(path))
+                        pkgList.AddRange(GetFilepaths(path, "*.pkg", SearchOption.AllDirectories).Select(p => new FileInfo(p)));
                     else
-                        Console.WriteLine("Unknown path: " + item);
+                        Console.WriteLine("Unknown path: " + path);
                 }
                 Console.ResetColor();
                 pkgList = pkgList.Where(i => i.Length > 0xC0 + 0x20).ToList(); // header + csum at the end
+                if (pkgList.Count == 0)
+                {
+                    Console.WriteLine("No packages were found. Check paths, and try again.");
+                    return;
+                }
+
                 var longestFilename = Math.Max(pkgList.Max(i => i.Name.Length), HeaderPkgName.Length);
                 var sigWidth = Math.Max(HeaderSginature.Length, 5);
                 var csumWidth = Math.Max(HeaderChecksum.Length, 5);
