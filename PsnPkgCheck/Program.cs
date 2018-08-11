@@ -52,17 +52,21 @@ namespace PsnPkgCheck
                 var csumWidth = Math.Max(HeaderChecksum.Length, 5);
                 var csumsWidth = 1 + sigWidth + 1 + csumWidth + 1;
                 var idealWidth = longestFilename + csumsWidth;
-                if (idealWidth > Console.LargestWindowWidth)
+                try
                 {
-                    longestFilename = Console.LargestWindowWidth - csumsWidth;
-                    idealWidth = Console.LargestWindowWidth;
+                    if (idealWidth > Console.LargestWindowWidth)
+                    {
+                        longestFilename = Console.LargestWindowWidth - csumsWidth;
+                        idealWidth = Console.LargestWindowWidth;
+                    }
+                    if (idealWidth > Console.WindowWidth)
+                    {
+                        Console.BufferWidth = Math.Max(Console.BufferWidth, idealWidth);
+                        Console.WindowWidth = idealWidth;
+                    }
+                    Console.BufferHeight = Math.Max(Console.BufferHeight, Math.Min(9999, pkgList.Count + 10));
                 }
-                if (idealWidth > Console.WindowWidth)
-                {
-                    Console.BufferWidth = Math.Max(Console.BufferWidth, idealWidth);
-                    Console.WindowWidth = idealWidth;
-                }
-                Console.BufferHeight = Math.Max(Console.BufferHeight, Math.Min(9999, pkgList.Count + 10));
+                catch (PlatformNotSupportedException) { }
                 Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSginature.PadLeft(sigWidth)} {HeaderChecksum.PadLeft(csumWidth)}");
                 var cts = new CancellationTokenSource();
                 Console.CancelKeyPress += (sender, eventArgs) => { cts.Cancel(); };
