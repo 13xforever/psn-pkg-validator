@@ -40,7 +40,6 @@ namespace PsnPkgCheck
                         Console.WriteLine("Unknown path: " + path);
                 }
                 Console.ResetColor();
-                pkgList = pkgList.Where(i => i.Length > 0xC0 + 0x20).ToList(); // header + csum at the end
                 if (pkgList.Count == 0)
                 {
                     Console.WriteLine("No packages were found. Check paths, and try again.");
@@ -109,7 +108,7 @@ namespace PsnPkgCheck
                                        }
                                    });
                 t.Start();
-                await PkgChecker.CheckAsync(pkgList, longestFilename, sigWidth, csumWidth, cts.Token).ConfigureAwait(false);
+                await PkgChecker.CheckAsync(pkgList, longestFilename, sigWidth, csumWidth, csumsWidth-2, cts.Token).ConfigureAwait(false);
                 cts.Cancel(false);
                 t.Join();
             }

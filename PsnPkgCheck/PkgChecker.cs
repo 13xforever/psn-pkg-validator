@@ -18,7 +18,7 @@ namespace PsnPkgCheck
         internal static int CurrentPadding { get; private set; }
         internal static readonly SemaphoreSlim Sync = new SemaphoreSlim(1, 1);
 
-        internal static async Task CheckAsync(List<FileInfo> pkgList, int fnameWidth, int sigWidth, int csumWidth, CancellationToken cancellationToken)
+        internal static async Task CheckAsync(List<FileInfo> pkgList, int fnameWidth, int sigWidth, int csumWidth, int allCsumsWidth, CancellationToken cancellationToken)
         {
             TotalFileSize = pkgList.Sum(i => i.Length);
 
@@ -29,6 +29,12 @@ namespace PsnPkgCheck
                 {
                     CurrentPadding = sigWidth;
                     CurrentFileSize = item.Length;
+                    if (item.Length < 0xC0 + 0x20) // header + csum at the end
+                    {
+                        Write("invalid pkg".PadLeft(allCsumsWidth) + Environment.NewLine, ConsoleColor.Red);
+                        continue;
+                    }
+
                     var buf = new byte[1024 * 1024]; // 1 MB
                     using (var file = File.Open(item.FullName, FileMode.Open, FileAccess.Read, FileShare.Read))
                     {
