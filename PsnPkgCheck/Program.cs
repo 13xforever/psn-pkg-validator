@@ -11,7 +11,7 @@ namespace PsnPkgCheck
     {
         private const string Title = "PSN PKG Validator";
         private const string HeaderPkgName = "Package name";
-        private const string HeaderSginature = "Header";
+        private const string HeaderSginature = "Signature";
         private const string HeaderChecksum = "Checksum";
 
         internal static async Task Main(string[] args)
@@ -47,7 +47,7 @@ namespace PsnPkgCheck
                 }
 
                 var longestFilename = Math.Max(pkgList.Max(i => i.Name.Length), HeaderPkgName.Length);
-                var sigWidth = Math.Max(HeaderSginature.Length, 5);
+                var sigWidth = Math.Max(HeaderSginature.Length, 8);
                 var csumWidth = Math.Max(HeaderChecksum.Length, 5);
                 var csumsWidth = 1 + sigWidth + 1 + csumWidth + 1;
                 var idealWidth = longestFilename + csumsWidth;

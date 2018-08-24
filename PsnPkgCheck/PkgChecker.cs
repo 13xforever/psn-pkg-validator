@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace PsnPkgCheck
 {
-    internal static class PkgChecker
+    public static class PkgChecker
     {
         internal static long TotalFileSize { get; private set; }
         internal static long ProcessedBytes { get; private set; }
@@ -40,14 +40,22 @@ namespace PsnPkgCheck
                     {
                         var header = new byte[0xc0];
                         file.ReadExact(header);
-                       if (!ValidateCmac(header))
+                        byte[] sha1Sum = null;
+                        using (var sha1 = SHA1.Create())
+                            sha1Sum = sha1.ComputeHash(header, 0, 0x80);
+                        if (!ValidateCmac(header))
                             Write("cmac".PadLeft(sigWidth) + " ", ConsoleColor.Red);
-                        else if (!ValidateSig(header))
-                            Write("ecdsa".PadLeft(sigWidth) + " ", ConsoleColor.Red);
-                        else if (!ValidateHash(header))
+                        else if (!ValidateHash(header, sha1Sum))
                             Write("sha1".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
+                        else if (!ValidateSigNew(header, sha1Sum))
+                        {
+                            if (!ValidateSigOld(header, sha1Sum))
+                                Write("ecdsa".PadLeft(sigWidth) + " ", ConsoleColor.Red);
+                            else
+                                Write("ok (old)".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
+                        }
                         else
-                            Write("ok".PadLeft(sigWidth) + " ", ConsoleColor.Green);
+                            Write("ok (new)".PadLeft(sigWidth) + " ", ConsoleColor.Green);
 
                         CurrentPadding = csumWidth;
                         file.Seek(0, SeekOrigin.Begin);
@@ -92,7 +100,7 @@ namespace PsnPkgCheck
             }
         }
 
-        private static void ReadExact(this Stream stream, byte[] buf)
+        public static void ReadExact(this Stream stream, byte[] buf)
         {
             var read = 0;
             var total = 0;
@@ -141,13 +149,16 @@ namespace PsnPkgCheck
 
         private static bool ValidateCmac(Span<byte> header)
         {
-            var actualCmac = GetCmac(header.Slice(0, 0x80));
+            var actualCmac = GetCmac(header.Slice(0, 0x80), VshCrypto.Ps3GpkgKey);
             var expectedCmac = header.Slice(0x80, 0x10);
             return expectedCmac.SequenceEqual(actualCmac);
         }
 
-        private static byte[] GetCmac(Span<byte> data)
+        private static byte[] GetCmac(Span<byte> data, byte[] omacKey, bool truncate = true)
         {
+            if (omacKey?.Length != 0x10)
+                throw new ArgumentException(nameof(omacKey));
+
             byte[] AESEncrypt(byte[] key, byte[] iv, Span<byte> dataToEncrypt)
             {
                 using (var result = new MemoryStream())
@@ -179,7 +190,6 @@ namespace PsnPkgCheck
 
             // SubKey generation
             // step 1, AES-128 with key K is applied to an all-zero input block.
-            var omacKey = VshCrypto.Ps3GpkgKey;
             byte[] derivedKey = AESEncrypt(omacKey, new byte[16], new byte[16]);
 
             // step 2, K1 is derived through the following operation:
@@ -220,7 +230,10 @@ namespace PsnPkgCheck
 
             // The result of the previous process will be the input of the last encryption.
             byte[] encResult = AESEncrypt(omacKey, new byte[16], buf);
-            return encResult.AsSpan(encResult.Length - 16, 16).ToArray();
+            if (truncate)
+                return encResult.AsSpan(encResult.Length - 16, 16).ToArray();
+            else
+                return encResult.AsSpan(encResult.Length - 0x14, 0x14).ToArray();
         }
 
         private static byte[] GetPs3Hmac(Span<byte> data)
@@ -242,33 +255,51 @@ namespace PsnPkgCheck
             return sha.AsSpan(0, 0x10).ToArray();
         }
 
-        private static bool ValidateSig(byte[] header)
+        private static byte[] GetSha1Hmac(Span<byte> data, Span<byte> key)
         {
-            return true;
-            //todo
-            var sig = header.AsSpan(0x90, 0x28).ToArray();
-            using (var ecdsa = ECDsa.Create(VshCrypto.Npdrm2ECparameters))
-                if (ecdsa.VerifyData(header, 0, 0x80, sig, HashAlgorithmName.SHA1))
-                    return true;
+            if (key.Length != 0x40)
+                throw new ArgumentException(nameof(key));
 
-            using (var ecdsa = ECDsa.Create(VshCrypto.Npdrm1ECParameters))
-                if (ecdsa.VerifyData(header, 0, 0x80, sig, HashAlgorithmName.SHA1))
-                    return true;
+            var ipad = new byte[0x40];
+            var tmp = new byte[0x40 + 0x14]; // opad + hash(ipad + message)
 
-            return false;
-        }
+            for (var i = 0; i < ipad.Length; i++)
+            {
+                tmp[i] = (byte)(key[i] ^ 0x5c); // opad
+                ipad[i] = (byte)(key[i] ^ 0x36);
+            }
 
-        private static bool ValidateHash(byte[] header)
-        {
             using (var sha1 = SHA1.Create())
             {
-                var hash = sha1.ComputeHash(header, 0, 0x80).AsSpan(0x14 - 8, 8);
-                var expectedHash = header.AsSpan(0xb8, 8);
-                return expectedHash.SequenceEqual(hash);
+                sha1.TransformBlock(ipad.ToArray(), 0, ipad.Length, null, 0);
+                sha1.TransformBlock(data.ToArray(), 0, data.Length, null, 0);
+                sha1.TransformFinalBlock(new byte[0], 0, 0);
+                Buffer.BlockCopy(sha1.Hash, 0, tmp, 0x40, 0x14);
             }
+            using (var sha1 = SHA1.Create())
+                return sha1.ComputeHash(tmp);
         }
 
-        private static string AsHexString(this byte[] bytes)
+        private static bool ValidateSigNew(byte[] header, byte[] hash)
+        {
+            var rs = VshCrypto.CreatePoint(header.AsSpan(0x90, 0x28));
+            return VshCrypto.VshInvCurve2.Verify(VshCrypto.NpdrmQ, rs.X, rs.Y, hash);
+        }
+
+        private static bool ValidateSigOld(byte[] header, byte[] hash)
+        {
+            var rs = VshCrypto.CreatePoint(header.AsSpan(0x90, 0x28));
+            return VshCrypto.VshInvCurve2.Verify(VshCrypto.NpdrmQOld, rs.X, rs.Y, hash);
+        }
+
+        private static bool ValidateHash(byte[] header, byte[] sha1)
+        {
+            var hash = sha1.AsSpan(0x14 - 8, 8);
+            var expectedHash = header.AsSpan(0xb8, 8);
+            return expectedHash.SequenceEqual(hash);
+        }
+
+        internal static string AsHexString(this byte[] bytes)
         {
             var result = new StringBuilder();
             foreach (var b in bytes)

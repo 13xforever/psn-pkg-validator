@@ -2,7 +2,7 @@
   "profiles": {
     "PsnPkgCheck": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Documents\\Downloads\\BLES01555 Ni No Kuni - Draggle.pkg\""
+      "commandLineArgs": "\"C:\\Documents\\Downloads\""
     }
   }
 }

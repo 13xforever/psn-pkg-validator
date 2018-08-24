@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27703.2047
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PsnPkgCheck", "PsnPkgCheck\PsnPkgCheck.csproj", "{3CCB4B81-C328-4397-A915-7545CA994664}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PsnPkgCheck", "PsnPkgCheck\PsnPkgCheck.csproj", "{3CCB4B81-C328-4397-A915-7545CA994664}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{71A30870-F216-419A-A8BF-6DEC264070CF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,9 @@ Global
 		{3CCB4B81-C328-4397-A915-7545CA994664}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3CCB4B81-C328-4397-A915-7545CA994664}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3CCB4B81-C328-4397-A915-7545CA994664}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71A30870-F216-419A-A8BF-6DEC264070CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71A30870-F216-419A-A8BF-6DEC264070CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71A30870-F216-419A-A8BF-6DEC264070CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
