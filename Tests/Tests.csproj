@@ -10,6 +10,8 @@
     <OutputType>Library</OutputType>
 
     <StartupObject />
+
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
