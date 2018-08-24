@@ -14,6 +14,28 @@ namespace PsnPkgCheck
         private const string HeaderSginature = "Signature";
         private const string HeaderChecksum = "Checksum";
 
+        private static readonly string[] Animation =
+        {
+            ".....",
+            "o....",
+            ".o...",
+            "..o..",
+            "...o.",
+            "....o",
+            ".....",
+            "....o",
+            "...o.",
+            "..o..",
+            ".o...",
+            "o....",
+            ".....",
+            "o...o",
+            ".o.o.",
+            "..O..",
+            ".o.o.",
+            "o...o",
+        };
+
         internal static async Task Main(string[] args)
         {
             try
@@ -73,7 +95,6 @@ namespace PsnPkgCheck
                                    {
                                        try
                                        {
-                                           var indicator = new[] {".", "..", "..."};
                                            var indicatorIdx = 0;
                                            while (!cts.Token.IsCancellationRequested)
                                            {
@@ -84,9 +105,9 @@ namespace PsnPkgCheck
                                                PkgChecker.Sync.Wait(cts.Token);
                                                try
                                                {
-                                                   var frame = indicator[(indicatorIdx++) % indicator.Length];
+                                                   var frame = Animation[(indicatorIdx++) % Animation.Length];
                                                    var currentProgress = PkgChecker.CurrentFileProcessedBytes;
-                                                   Console.Title = $"{Title} [{(double)(PkgChecker.ProcessedBytes + currentProgress) / PkgChecker.TotalFileSize * 100:0.00}% done{frame}]";
+                                                   Console.Title = $"{Title} [{(double)(PkgChecker.ProcessedBytes + currentProgress) / PkgChecker.TotalFileSize * 100:0.00}%] {frame}";
                                                    if (PkgChecker.CurrentPadding > 0)
                                                    {
                                                        Console.CursorVisible = false;

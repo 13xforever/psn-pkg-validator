@@ -55,7 +55,7 @@ namespace PsnPkgCheck
                                 Write("ok (old)".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
                         }
                         else
-                            Write("ok (new)".PadLeft(sigWidth) + " ", ConsoleColor.Green);
+                            Write("ok".PadLeft(sigWidth) + " ", ConsoleColor.Green);
 
                         CurrentPadding = csumWidth;
                         file.Seek(0, SeekOrigin.Begin);
