@@ -9,6 +9,15 @@ Usage
 Simply drag-and-drop files and/or folders you want to check onto the executable.
 Alternatively if you prefer to run from console, just supply paths you want to check.
 
+But what does it all mean?
+--------------------------
+
+PKG Validator presents result in two columns: `Signature` and `Checksum`.
+
+`Signature` validates if the PKG is authentic and was produced by Sony, it does this by calculating various security values that are present in the header structure. Most PKGs have several levels of layered protection that is designed to make sure that nothing was modified. Any result other than green `ok` means that the PKG wasn't made by Sony, and nothing more.
+
+`Checksum` on the other hand is a simple full PKG file hash validation that tells if it was corrupted in the transfer or not. It does not care if the file was produced by Sony itself, or made with homebrew tools. You want this to be green `ok` for all your PKGs, always.
+
 System Requirements
 ===================
 
