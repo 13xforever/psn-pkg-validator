@@ -18,7 +18,7 @@ PKG Validator presents result in two columns: `Signature` and `Checksum`.
 
 `Checksum` on the other hand is a simple full PKG file hash validation that tells if it was corrupted in the transfer or not. It does not care if the file was produced by Sony itself, or made with homebrew tools. You want this to be green `ok` for all your PKGs, always.
 
-![Quick guide to results](https://user-images.githubusercontent.com/36445/49114424-0108e880-f2ba-11e8-99e3-e5feefbb9944.png)
+![Quick guide to results](https://user-images.githubusercontent.com/36445/49114564-52b17300-f2ba-11e8-9d8b-5ab567deff56.png)
 
 System Requirements
 ===================
