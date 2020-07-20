@@ -101,7 +101,7 @@ namespace PsnPkgCheck
                 return null;
 
             if (hexString.Length == 0)
-                return new byte[0];
+                return Array.Empty<byte>();
 
             if (hexString.Length%2 == 1)
                 throw new ArgumentException("Hex string cannot have an odd number of characters");

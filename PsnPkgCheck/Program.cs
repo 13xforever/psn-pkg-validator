@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -46,9 +47,10 @@ namespace PsnPkgCheck
                     return;
                 }
 
+                Console.OutputEncoding = new UTF8Encoding(false);
                 Console.Title = Title;
                 Console.CursorVisible = false;
-                Console.WriteLine("Scanning for pkgs...");
+                Console.WriteLine("Scanning for PKGs...");
                 var pkgList = new List<FileInfo>();
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 foreach (var item in args)
@@ -57,7 +59,7 @@ namespace PsnPkgCheck
                     if (File.Exists(path))
                         pkgList.Add(new FileInfo(path));
                     else if (Directory.Exists(path))
-                        pkgList.AddRange(GetFilepaths(path, "*.pkg", SearchOption.AllDirectories).Select(p => new FileInfo(p)));
+                        pkgList.AddRange(GetFilePaths(path, "*.pkg", SearchOption.AllDirectories).Select(p => new FileInfo(p)));
                     else
                         Console.WriteLine("Unknown path: " + path);
                 }
@@ -89,7 +91,7 @@ namespace PsnPkgCheck
                 }
                 catch (PlatformNotSupportedException) { }
                 Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSginature.PadLeft(sigWidth)} {HeaderChecksum.PadLeft(csumWidth)}");
-                var cts = new CancellationTokenSource();
+                using var cts = new CancellationTokenSource();
                 Console.CancelKeyPress += (sender, eventArgs) => { cts.Cancel(); };
                 var t = new Thread(() =>
                                    {
@@ -111,10 +113,10 @@ namespace PsnPkgCheck
                                                    if (PkgChecker.CurrentPadding > 0)
                                                    {
                                                        Console.CursorVisible = false;
-                                                       var oldPos = (top: Console.CursorTop, left: Console.CursorLeft);
+                                                       var (top, left) = (Console.CursorTop, Console.CursorLeft);
                                                        Console.Write($"{(double)currentProgress / PkgChecker.CurrentFileSize * 100:0}%".PadLeft(PkgChecker.CurrentPadding));
-                                                       Console.CursorTop = oldPos.top;
-                                                       Console.CursorLeft = oldPos.left;
+                                                       Console.CursorTop = top;
+                                                       Console.CursorLeft = left;
                                                        Console.CursorVisible = false;
                                                    }
                                                }
@@ -143,7 +145,7 @@ namespace PsnPkgCheck
             }
         }
 
-        private static IEnumerable<string> GetFilepaths(string rootPath, string patternMatch, SearchOption searchOption)
+        private static IEnumerable<string> GetFilePaths(string rootPath, string patternMatch, SearchOption searchOption)
         {
             var foundFiles = Enumerable.Empty<string>();
             try
@@ -164,7 +166,7 @@ namespace PsnPkgCheck
                     {
                         try
                         {
-                            var newFiles = GetFilepaths(dir, patternMatch, searchOption);
+                            var newFiles = GetFilePaths(dir, patternMatch, searchOption);
                             foundFiles = foundFiles.Concat(newFiles);
                         }
                         catch (Exception e) when (e is UnauthorizedAccessException || e is PathTooLongException)

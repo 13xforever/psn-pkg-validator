@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Aes = System.Security.Cryptography.Aes;
 
 namespace PsnPkgCheck
 {
@@ -22,6 +23,7 @@ namespace PsnPkgCheck
         {
             TotalFileSize = pkgList.Sum(i => i.Length);
 
+            var buf = new byte[1024 * 1024]; // 1 MB
             foreach (var item in pkgList)
             {
                 Write($"{item.Name.Trim(fnameWidth).PadRight(fnameWidth)} ");
@@ -35,55 +37,52 @@ namespace PsnPkgCheck
                         continue;
                     }
 
-                    var buf = new byte[1024 * 1024]; // 1 MB
-                    using (var file = File.Open(item.FullName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using var file = File.Open(item.FullName, FileMode.Open, FileAccess.Read, FileShare.Read);
+                    var header = new byte[0xc0];
+                    file.ReadExact(header);
+                    byte[] sha1Sum = null;
+                    using (var sha1 = SHA1.Create())
+                        sha1Sum = sha1.ComputeHash(header, 0, 0x80);
+                    if (!ValidateCmac(header))
+                        Write("cmac".PadLeft(sigWidth) + " ", ConsoleColor.Red);
+                    else if (!ValidateHash(header, sha1Sum))
+                        Write("sha1".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
+                    else if (!ValidateSigNew(header, sha1Sum))
                     {
-                        var header = new byte[0xc0];
-                        file.ReadExact(header);
-                        byte[] sha1Sum = null;
-                        using (var sha1 = SHA1.Create())
-                            sha1Sum = sha1.ComputeHash(header, 0, 0x80);
-                        if (!ValidateCmac(header))
-                            Write("cmac".PadLeft(sigWidth) + " ", ConsoleColor.Red);
-                        else if (!ValidateHash(header, sha1Sum))
-                            Write("sha1".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
-                        else if (!ValidateSigNew(header, sha1Sum))
-                        {
-                            if (!ValidateSigOld(header, sha1Sum))
-                                Write("ecdsa".PadLeft(sigWidth) + " ", ConsoleColor.Red);
-                            else
-                                Write("ok (old)".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
-                        }
+                        if (!ValidateSigOld(header, sha1Sum))
+                            Write("ecdsa".PadLeft(sigWidth) + " ", ConsoleColor.Red);
                         else
-                            Write("ok".PadLeft(sigWidth) + " ", ConsoleColor.Green);
-
-                        CurrentPadding = csumWidth;
-                        file.Seek(0, SeekOrigin.Begin);
-                        byte[] hash;
-                        using (var sha1 = SHA1.Create())
-                        {
-                            var dataLengthToHash = CurrentFileSize - 0x20;
-                            int read;
-                            do
-                            {
-                                read = await file.ReadAsync(buf, 0, (int)Math.Min(buf.Length, dataLengthToHash - CurrentFileProcessedBytes), cancellationToken).ConfigureAwait(false);
-                                CurrentFileProcessedBytes += read;
-                                sha1.TransformBlock(buf, 0, read, null, 0);
-                            } while (read > 0 && CurrentFileProcessedBytes < dataLengthToHash && !cancellationToken.IsCancellationRequested);
-                            sha1.TransformFinalBlock(buf, 0, 0);
-                            hash = sha1.Hash;
-                        }
-                        if (cancellationToken.IsCancellationRequested)
-                            return;
-
-                        var expectedHash = new byte[0x14];
-                        file.ReadExact(expectedHash);
-                        CurrentFileProcessedBytes += 0x20;
-                        if (!expectedHash.SequenceEqual(hash))
-                            Write("fail".PadLeft(csumWidth) + Environment.NewLine, ConsoleColor.Red);
-                        else
-                            Write("ok".PadLeft(csumWidth) + Environment.NewLine, ConsoleColor.Green);
+                            Write("ok (old)".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
                     }
+                    else
+                        Write("ok".PadLeft(sigWidth) + " ", ConsoleColor.Green);
+
+                    CurrentPadding = csumWidth;
+                    file.Seek(0, SeekOrigin.Begin);
+                    byte[] hash;
+                    using (var sha1 = SHA1.Create())
+                    {
+                        var dataLengthToHash = CurrentFileSize - 0x20;
+                        int read;
+                        do
+                        {
+                            read = await file.ReadAsync(buf, 0, (int)Math.Min(buf.Length, dataLengthToHash - CurrentFileProcessedBytes), cancellationToken).ConfigureAwait(false);
+                            CurrentFileProcessedBytes += read;
+                            sha1.TransformBlock(buf, 0, read, null, 0);
+                        } while (read > 0 && CurrentFileProcessedBytes < dataLengthToHash && !cancellationToken.IsCancellationRequested);
+                        sha1.TransformFinalBlock(buf, 0, 0);
+                        hash = sha1.Hash;
+                    }
+                    if (cancellationToken.IsCancellationRequested)
+                        return;
+
+                    var expectedHash = new byte[0x14];
+                    file.ReadExact(expectedHash);
+                    CurrentFileProcessedBytes += 0x20;
+                    if (!expectedHash.SequenceEqual(hash))
+                        Write("fail".PadLeft(csumWidth) + Environment.NewLine, ConsoleColor.Red);
+                    else
+                        Write("ok".PadLeft(csumWidth) + Environment.NewLine, ConsoleColor.Green);
                 }
                 catch (Exception e)
                 {
@@ -159,23 +158,19 @@ namespace PsnPkgCheck
             if (omacKey?.Length != 0x10)
                 throw new ArgumentException(nameof(omacKey));
 
-            byte[] AESEncrypt(byte[] key, byte[] iv, Span<byte> dataToEncrypt)
+            static byte[] AESEncrypt(byte[] key, byte[] iv, Span<byte> dataToEncrypt)
             {
-                using (var result = new MemoryStream())
-                using (var aes = Aes.Create())
-                {
-                    aes.Mode = CipherMode.CBC;
-                    aes.Padding = PaddingMode.None;
-                    using (var cs = new CryptoStream(result, aes.CreateEncryptor(key, iv), CryptoStreamMode.Write))
-                    {
-                        cs.Write(dataToEncrypt);
-                        cs.FlushFinalBlock();
-                        return result.ToArray();
-                    }
-                }
+                using var result = new MemoryStream();
+                using var aes = Aes.Create();
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.None;
+                using var cs = new CryptoStream(result, aes.CreateEncryptor(key, iv), CryptoStreamMode.Write);
+                cs.Write(dataToEncrypt);
+                cs.FlushFinalBlock();
+                return result.ToArray();
             }
 
-            byte[] Rol(byte[] b)
+            static byte[] Rol(byte[] b)
             {
                 var r = new byte[b.Length];
                 byte carry = 0;
@@ -272,8 +267,7 @@ namespace PsnPkgCheck
             using (var sha1 = SHA1.Create())
             {
                 sha1.TransformBlock(ipad.ToArray(), 0, ipad.Length, null, 0);
-                sha1.TransformBlock(data.ToArray(), 0, data.Length, null, 0);
-                sha1.TransformFinalBlock(new byte[0], 0, 0);
+                sha1.TransformFinalBlock(data.ToArray(), 0, data.Length);
                 Buffer.BlockCopy(sha1.Hash, 0, tmp, 0x40, 0x14);
             }
             using (var sha1 = SHA1.Create())

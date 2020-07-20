@@ -5,6 +5,7 @@ namespace PsnPkgCheck
 {
     public sealed class Ecdsa
     {
+#pragma warning disable IDE1006 // Naming Styles
         private static readonly byte[] inv256 =
         {
             0x01, 0xab, 0xcd, 0xb7, 0x39, 0xa3, 0xc5, 0xef,
@@ -48,7 +49,7 @@ namespace PsnPkgCheck
             catch (Exception e)
             {
                 Console.WriteLine(e);
-                throw e;
+                throw;
             }
         }
 
@@ -100,7 +101,7 @@ namespace PsnPkgCheck
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                throw ex;
+                throw;
             }
         }
 
@@ -410,4 +411,5 @@ namespace PsnPkgCheck
             return result;
         }
     }
+#pragma warning restore IDE1006 // Naming Styles
 }
