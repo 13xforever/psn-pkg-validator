@@ -70,11 +70,11 @@ namespace PsnPkgCheck
                 bn_to_mon(sCopy, ecN, 21);
                 bn_to_mon(eCopy, ecN, 21);
 
-                var sInv = new byte[21];
+                Span<byte> sInv = stackalloc byte[21];
                 bn_mon_inv(sInv, sCopy, ecN, 21);
 
-                var w1 = new byte[21];
-                var w2 = new byte[21];
+                Span<byte> w1 = stackalloc byte[21];
+                Span<byte> w2 = stackalloc byte[21];
                 bn_mon_mul(w1, eCopy, sInv, ecN, 21);
                 bn_mon_mul(w2, rCopy, sInv, ecN, 21);
 
@@ -105,7 +105,7 @@ namespace PsnPkgCheck
             }
         }
 
-        private static void bn_reduce(byte[] d, Span<byte> N, int n)
+        private static void bn_reduce(Span<byte> d, Span<byte> N, int n)
         {
             if (bn_compare(d, N, n) >= 0)
                 bn_sub_1(d, d, N, n);
@@ -124,7 +124,7 @@ namespace PsnPkgCheck
             return 0;
         }
 
-        private static bool bn_add_1(byte[] d, Span<byte> a, Span<byte> b, int n)
+        private static bool bn_add_1(Span<byte> d, Span<byte> a, Span<byte> b, int n)
         {
             byte c = 0;
             for (var i = n - 1; i >= 0; i--)
@@ -136,7 +136,7 @@ namespace PsnPkgCheck
             return c != 0;
         }
 
-        private static bool bn_sub_1(byte[] d, Span<byte> a, Span<byte> b, int n)
+        private static bool bn_sub_1(Span<byte> d, Span<byte> a, Span<byte> b, int n)
         {
             byte c = 1;
             for (var i = n - 1; i >= 0; i--)
@@ -148,41 +148,36 @@ namespace PsnPkgCheck
             return c == 0;
         }
 
-        private static void bn_to_mon(byte[] d, Span<byte> N, int n)
+        private static void bn_to_mon(Span<byte> d, Span<byte> N, int n)
         {
             for (var i = 0; i < n * 8; i++)
                 bn_add(d, d, d, N, n);
         }
 
-        private static void bn_add(byte[] d, Span<byte> a, Span<byte> b, Span<byte> N, int n)
+        private static void bn_add(Span<byte> d, Span<byte> a, Span<byte> b, Span<byte> N, int n)
         {
             if (bn_add_1(d, a, b, n))
                 bn_sub_1(d, d, N, n);
             bn_reduce(d, N, n);
         }
 
-        private static void bn_mon_inv(byte[] d, Span<byte> a, Span<byte> N, int n)
+        private static void bn_mon_inv(Span<byte> d, Span<byte> a, Span<byte> N, int n)
         {
-            var t = new byte[512];
-            var s = new byte[512];
+            Span<byte> t = stackalloc byte[512];
+            Span<byte> s = stackalloc byte[512];
+            s.Clear();
             s[n - 1] = 2;
             bn_sub_1(t, N, s, n);
             bn_mon_exp(d, a, N, n, t, n);
         }
 
-        private static void bn_zero(byte[] d, int n)
-        {
-            Array.Clear(d, 0, n);
-        }
+        private static void bn_zero(Span<byte> d, int n) => d.Slice(0, n).Clear();
 
-        private static void bn_copy(byte[] d, Span<byte> a, int n)
-        {
-            Buffer.BlockCopy(a.ToArray(), 0, d, 0, n);
-        }
+        private static void bn_copy(Span<byte> d, Span<byte> a, int n) => a.Slice(0, n).CopyTo(d);
 
-        private static void bn_mon_exp(byte[] d, Span<byte> a, Span<byte> N, int n, Span<byte> e, int en)
+        private static void bn_mon_exp(Span<byte> d, Span<byte> a, Span<byte> N, int n, Span<byte> e, int en)
         {
-            var t = new byte[512];
+            Span<byte> t = stackalloc byte[512];
             bn_zero(d, n);
             d[n - 1] = 1;
             bn_to_mon(d, N, n);
@@ -197,15 +192,15 @@ namespace PsnPkgCheck
             }
         }
 
-        private static void bn_mon_mul(byte[] d, Span<byte> a, Span<byte> b, Span<byte> N, int n)
+        private static void bn_mon_mul(Span<byte> d, Span<byte> a, Span<byte> b, Span<byte> N, int n)
         {
-            var t = new byte[512];
+            Span<byte> t = stackalloc byte[512];
             for (var i = n - 1; i >= 0; i--)
                 bn_mon_muladd_dig(t, a, b[i], N, n);
             bn_copy(d, t, n);
         }
 
-        private static void bn_mon_muladd_dig(byte[] d, Span<byte> a, byte b, Span<byte> N, int n)
+        private static void bn_mon_muladd_dig(Span<byte> d, Span<byte> a, byte b, Span<byte> N, int n)
         {
             var z = (byte)(-(d[n - 1] + a[n - 1] * b) * inv256[N[n - 1] / 2]);
 
@@ -228,9 +223,10 @@ namespace PsnPkgCheck
             bn_reduce(d, N, n);
         }
 
-        private static void bn_from_mon(byte[] d, Span<byte> N, int n)
+        private static void bn_from_mon(Span<byte> d, Span<byte> N, int n)
         {
-            var t = new byte[512];
+            Span<byte> t = stackalloc byte[512];
+            t.Clear();
             t[n - 1] = 1;
             bn_mon_mul(d, d, t, N, n);
         }
