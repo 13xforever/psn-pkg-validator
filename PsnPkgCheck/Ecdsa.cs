@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Reflection.Metadata.Ecma335;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace PsnPkgCheck
@@ -25,6 +27,47 @@ namespace PsnPkgCheck
             0x21, 0xcb, 0xed, 0xd7, 0x59, 0xc3, 0xe5, 0x0f,
             0x11, 0x3b, 0x5d, 0xc7, 0x49, 0x33, 0x55, 0xff,
         };
+
+        private ref struct ECPointRef
+        {
+            public ECPointRef(Span<byte> x, Span<byte> y)
+            {
+                X = x;
+                Y = y;
+            }
+
+            public Span<byte> X;
+            public Span<byte> Y;
+
+            public static implicit operator ECPointRef(ECPoint p) => new ECPointRef(p.X, p.Y);
+
+            public void CopyFrom(ECPoint p)
+            {
+                p.X.CopyTo(X);
+                p.Y.CopyTo(Y);
+            }
+
+            public void CopyFrom(ReadOnlyECPointRef p)
+            {
+                p.X.CopyTo(X);
+                p.Y.CopyTo(Y);
+            }
+        }
+
+        private readonly ref struct ReadOnlyECPointRef
+        {
+            public ReadOnlyECPointRef(ReadOnlySpan<byte> x, ReadOnlySpan<byte> y)
+            {
+                X = x;
+                Y = y;
+            }
+
+            public readonly ReadOnlySpan<byte> X;
+            public readonly ReadOnlySpan<byte> Y;
+
+            public static implicit operator ReadOnlyECPointRef(ECPoint p) => new ReadOnlyECPointRef(p.X, p.Y);
+            public static implicit operator ReadOnlyECPointRef(ECPointRef p) => new ReadOnlyECPointRef(p.X, p.Y);
+        }
 
         private readonly byte[] ecP;
         private readonly byte[] ecA;
@@ -53,11 +96,12 @@ namespace PsnPkgCheck
             }
         }
 
-        public bool Verify(in ECPoint q, Span<byte> r, Span<byte> s, Span<byte> hash)
+        public bool Verify(in ECPoint q, in Span<byte> r, in Span<byte> s, in Span<byte> hash)
         {
             try
             {
-                var qCopy = Clone(q);
+                var qCopy = new ECPointRef(stackalloc byte[20], stackalloc byte[20]);
+                qCopy.CopyFrom(q);
                 var rCopy = CloneAndExpand(r);
                 var sCopy = CloneAndExpand(s);
                 var eCopy = CloneAndExpand(hash);
@@ -81,8 +125,8 @@ namespace PsnPkgCheck
                 bn_from_mon(w1, ecN, 21);
                 bn_from_mon(w2, ecN, 21);
 
-                var r1 = new ECPoint { X = new byte[20], Y = new byte[20] };
-                var r2 = new ECPoint { X = new byte[20], Y = new byte[20] };
+                var r1 = new ECPointRef { X = stackalloc byte[20], Y = stackalloc byte[20] };
+                var r2 = new ECPointRef { X = stackalloc byte[20], Y = stackalloc byte[20] };
                 point_mul(r1, w1, ecG);
                 point_mul(r2, w2, qCopy);
 
@@ -105,13 +149,13 @@ namespace PsnPkgCheck
             }
         }
 
-        private static void bn_reduce(Span<byte> d, Span<byte> N, int n)
+        private static void bn_reduce(Span<byte> d, in ReadOnlySpan<byte> N, in int n)
         {
             if (bn_compare(d, N, n) >= 0)
                 bn_sub_1(d, d, N, n);
         }
 
-        private static int bn_compare(Span<byte> a, Span<byte> b, int n)
+        private static int bn_compare(in Span<byte> a, in ReadOnlySpan<byte> b, in int n)
         {
             for (var i = 0; i < n; i++)
             {
@@ -124,7 +168,7 @@ namespace PsnPkgCheck
             return 0;
         }
 
-        private static bool bn_add_1(Span<byte> d, Span<byte> a, Span<byte> b, int n)
+        private static bool bn_add_1(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b, in int n)
         {
             byte c = 0;
             for (var i = n - 1; i >= 0; i--)
@@ -136,7 +180,7 @@ namespace PsnPkgCheck
             return c != 0;
         }
 
-        private static bool bn_sub_1(Span<byte> d, Span<byte> a, Span<byte> b, int n)
+        private static bool bn_sub_1(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b, in int n)
         {
             byte c = 1;
             for (var i = n - 1; i >= 0; i--)
@@ -148,20 +192,20 @@ namespace PsnPkgCheck
             return c == 0;
         }
 
-        private static void bn_to_mon(Span<byte> d, Span<byte> N, int n)
+        private static void bn_to_mon(Span<byte> d, in ReadOnlySpan<byte> N, in int n)
         {
             for (var i = 0; i < n * 8; i++)
                 bn_add(d, d, d, N, n);
         }
 
-        private static void bn_add(Span<byte> d, Span<byte> a, Span<byte> b, Span<byte> N, int n)
+        private static void bn_add(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b, in ReadOnlySpan<byte> N, in int n)
         {
             if (bn_add_1(d, a, b, n))
                 bn_sub_1(d, d, N, n);
             bn_reduce(d, N, n);
         }
 
-        private static void bn_mon_inv(Span<byte> d, Span<byte> a, Span<byte> N, int n)
+        private static void bn_mon_inv(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> N, in int n)
         {
             Span<byte> t = stackalloc byte[512];
             Span<byte> s = stackalloc byte[512];
@@ -171,11 +215,11 @@ namespace PsnPkgCheck
             bn_mon_exp(d, a, N, n, t, n);
         }
 
-        private static void bn_zero(Span<byte> d, int n) => d.Slice(0, n).Clear();
+        private static void bn_zero(Span<byte> d, in int n) => d.Slice(0, n).Clear();
 
-        private static void bn_copy(Span<byte> d, Span<byte> a, int n) => a.Slice(0, n).CopyTo(d);
+        private static void bn_copy(Span<byte> d, in ReadOnlySpan<byte> a, in int n) => a.Slice(0, n).CopyTo(d);
 
-        private static void bn_mon_exp(Span<byte> d, Span<byte> a, Span<byte> N, int n, Span<byte> e, int en)
+        private static void bn_mon_exp(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> N, in int n, in ReadOnlySpan<byte> e, in int en)
         {
             Span<byte> t = stackalloc byte[512];
             bn_zero(d, n);
@@ -192,7 +236,7 @@ namespace PsnPkgCheck
             }
         }
 
-        private static void bn_mon_mul(Span<byte> d, Span<byte> a, Span<byte> b, Span<byte> N, int n)
+        private static void bn_mon_mul(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b, in ReadOnlySpan<byte> N, in int n)
         {
             Span<byte> t = stackalloc byte[512];
             for (var i = n - 1; i >= 0; i--)
@@ -200,7 +244,7 @@ namespace PsnPkgCheck
             bn_copy(d, t, n);
         }
 
-        private static void bn_mon_muladd_dig(Span<byte> d, Span<byte> a, byte b, Span<byte> N, int n)
+        private static void bn_mon_muladd_dig(Span<byte> d, in ReadOnlySpan<byte> a, in byte b, in ReadOnlySpan<byte> N, in int n)
         {
             var z = (byte)(-(d[n - 1] + a[n - 1] * b) * inv256[N[n - 1] / 2]);
 
@@ -223,7 +267,7 @@ namespace PsnPkgCheck
             bn_reduce(d, N, n);
         }
 
-        private static void bn_from_mon(Span<byte> d, Span<byte> N, int n)
+        private static void bn_from_mon(Span<byte> d, in ReadOnlySpan<byte> N, in int n)
         {
             Span<byte> t = stackalloc byte[512];
             t.Clear();
@@ -231,7 +275,7 @@ namespace PsnPkgCheck
             bn_mon_mul(d, d, t, N, n);
         }
 
-        private void point_mul(ECPoint d, Span<byte> a, in ECPoint b)
+        private void point_mul(ECPointRef d, in ReadOnlySpan<byte> a, in ECPointRef b)
         {
             point_zero(d);
             for (var i = 0; i < 21; i++)
@@ -243,16 +287,16 @@ namespace PsnPkgCheck
             }
         }
 
-        private static void point_zero(ECPoint d)
+        private static void point_zero(ECPointRef d)
         {
-            Array.Clear(d.X, 0, d.X.Length);
-            Array.Clear(d.Y, 0, d.Y.Length);
+            d.X.Clear();
+            d.Y.Clear();
         }
 
-        private void point_double(ECPoint r, in ECPoint p)
+        private void point_double(ECPointRef r, in ReadOnlyECPointRef p)
         {
-            var s = new byte[20];
-            var t = new byte[20];
+            Span<byte> s = stackalloc byte[20];
+            Span<byte> t = stackalloc byte[20];
 
             if (elt_is_zero(p.Y))
             {
@@ -260,7 +304,8 @@ namespace PsnPkgCheck
                 return;
             }
 
-            var pp = Clone(p);
+            var pp = new ECPointRef(stackalloc byte[20], stackalloc byte[20]);
+            pp.CopyFrom(p);
 
             elt_square(t, pp.X); // t = px*px
             elt_add(s, t, t); // s = 2*px*px
@@ -280,34 +325,31 @@ namespace PsnPkgCheck
             elt_sub(r.Y, r.Y, pp.Y); // ry = -s*(rx-px) - py
         }
 
-        private void elt_square(byte[] d, Span<byte> a)
+        private void elt_square(Span<byte> d, in ReadOnlySpan<byte> a)
         {
             elt_mul(d, a, a);
         }
 
-        private void elt_mul(byte[] d, Span<byte> a, Span<byte> b)
+        private void elt_mul(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b)
         {
             bn_mon_mul(d, a, b, ecP, 20);
         }
 
-        private void elt_add(byte[] d, Span<byte> a, Span<byte> b)
+        private void elt_add(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b)
         {
             bn_add(d, a, b, ecP, 20);
         }
 
-        private void elt_inv(byte[] d, Span<byte> a)
+        private void elt_inv(Span<byte> d, in ReadOnlySpan<byte> a)
         {
-            var s = new byte[20];
+            Span<byte> s = stackalloc byte[20];
             elt_copy(s, a);
             bn_mon_inv(d, s, ecP, 20);
         }
 
-        private static void elt_copy(byte[] d, Span<byte> a)
-        {
-            Buffer.BlockCopy(a.ToArray(), 0, d, 0, 20);
-        }
+        private static void elt_copy(Span<byte> d, in ReadOnlySpan<byte> a) => a.Slice(0, 20).CopyTo(d);
 
-        private static bool elt_is_zero(Span<byte> d)
+        private static bool elt_is_zero(in ReadOnlySpan<byte> d)
         {
             for (var i = 0; i < 20; i++)
                 if (d[i] != 0)
@@ -315,18 +357,18 @@ namespace PsnPkgCheck
             return true;
         }
 
-        private void elt_sub(byte[] d, Span<byte> a, Span<byte> b)
+        private void elt_sub(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b)
         {
             bn_sub(d, a, b, ecP, 20);
         }
 
-        private static void bn_sub(byte[] d, Span<byte> a, Span<byte> b, Span<byte> N, int n)
+        private static void bn_sub(Span<byte> d, in ReadOnlySpan<byte> a, in ReadOnlySpan<byte> b, in ReadOnlySpan<byte> N, in int n)
         {
             if (bn_sub_1(d, a, b, n))
                 bn_add_1(d, d, N, n);
         }
 
-        private void point_add(ECPoint r, in ECPoint p, in ECPoint q)
+        private void point_add(ECPointRef r, in ReadOnlyECPointRef p, in ReadOnlyECPointRef q)
         {
             if (point_is_zero(p))
             {
@@ -342,9 +384,11 @@ namespace PsnPkgCheck
                 return;
             }
 
-            var u = new byte[20];
-            var pp = Clone(p);
-            var qq = Clone(q);
+            Span<byte> u = stackalloc byte[20];
+            var pp = new ECPointRef(stackalloc byte[20], stackalloc byte[20]);
+            var qq = new ECPointRef(stackalloc byte[20], stackalloc byte[20]);
+            pp.CopyFrom(p);
+            qq.CopyFrom(q);
             elt_sub(u, qq.X, pp.X);
 
             if (elt_is_zero(u))
@@ -357,10 +401,10 @@ namespace PsnPkgCheck
                 return;
             }
 
-            var t = new byte[20];
+            Span<byte> t = stackalloc byte[20];
             elt_inv(t, u); // t = 1/(qx-px)
             elt_sub(u, qq.Y, pp.Y); // u = qy-py
-            var s = new byte[20];
+            Span<byte> s = stackalloc byte[20];
             elt_mul(s, t, u); // s = (qy-py)/(qx-px)
             elt_square(r.X, s); // rx = s*s
             elt_add(t, pp.X, qq.X); // t = px+qx
@@ -371,18 +415,15 @@ namespace PsnPkgCheck
             elt_sub(r.Y, r.Y, pp.Y); // ry = -s*(rx-px) - py
         }
 
-        private static bool point_is_zero(in ECPoint p)
-        {
-            return elt_is_zero(p.X) && elt_is_zero(p.Y);
-        }
+        private static bool point_is_zero(in ReadOnlyECPointRef p) => elt_is_zero(p.X) && elt_is_zero(p.Y);
 
-        private void point_from_mon(ECPoint p)
+        private void point_from_mon(ECPointRef p)
         {
             bn_from_mon(p.X, ecP, 20);
             bn_from_mon(p.Y, ecP, 20);
         }
 
-        private void point_to_mon(ECPoint p)
+        private void point_to_mon(ECPointRef p)
         {
             bn_to_mon(p.X, ecP, 20);
             bn_to_mon(p.Y, ecP, 20);
@@ -395,15 +436,15 @@ namespace PsnPkgCheck
                 X = new byte[20],
                 Y = new byte[20],
             };
-            Buffer.BlockCopy(p.X, 0, result.X, 0 , 20);
-            Buffer.BlockCopy(p.Y, 0, result.Y, 0 , 20);
+            p.X.AsSpan().CopyTo(result.X);
+            p.Y.AsSpan().CopyTo(result.Y);
             return result;
         }
 
-        private static byte[] CloneAndExpand(Span<byte> a)
+        private static byte[] CloneAndExpand(in ReadOnlySpan<byte> a)
         {
             var result = new byte[21];
-            Buffer.BlockCopy(a.ToArray(), 0, result, 1, 20);
+            a.CopyTo(result.AsSpan().Slice(1));
             return result;
         }
     }

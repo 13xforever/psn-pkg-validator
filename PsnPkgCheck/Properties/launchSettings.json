@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "PsnPkgCheck": {
-      "commandName": "Project",
-      "commandLineArgs": "\"C:\\Documents\\Downloads\""
-    }
-  }
-}
