@@ -44,7 +44,6 @@ namespace PsnPkgCheck
                 if (args.Length == 0)
                 {
                     Console.WriteLine("Drag .pkg files and/or folders onto this .exe to verify the packages.");
-                    var isQuoted = false;
                     var isFirstChar = true;
                     var completedPath = false;
                     var path = new StringBuilder();
@@ -54,9 +53,7 @@ namespace PsnPkgCheck
                         if (isFirstChar)
                         {
                             isFirstChar = false;
-                            if (keyInfo.KeyChar == '"')
-                                isQuoted = true;
-                            else
+                            if (keyInfo.KeyChar != '"')
                                 return;
                         }
                         else
