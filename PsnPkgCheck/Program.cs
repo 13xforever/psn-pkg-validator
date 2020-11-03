@@ -10,9 +10,9 @@ namespace PsnPkgCheck
 {
     internal static class Program
     {
-        private const string Title = "PSN PKG Validator v1.3";
+        private const string Title = "PSN PKG Validator v1.3.1";
         private const string HeaderPkgName = "Package name";
-        private const string HeaderSginature = "Signature";
+        private const string HeaderSignature = "Signature";
         private const string HeaderChecksum = "Checksum";
 
         private static readonly string[] Animation =
@@ -44,7 +44,33 @@ namespace PsnPkgCheck
                 if (args.Length == 0)
                 {
                     Console.WriteLine("Drag .pkg files and/or folders onto this .exe to verify the packages.");
-                    return;
+                    var isQuoted = false;
+                    var isFirstChar = true;
+                    var completedPath = false;
+                    var path = new StringBuilder();
+                    do
+                    {
+                        var keyInfo = Console.ReadKey(true);
+                        if (isFirstChar)
+                        {
+                            isFirstChar = false;
+                            if (keyInfo.KeyChar == '"')
+                                isQuoted = true;
+                            else
+                                return;
+                        }
+                        else
+                        {
+                            if (keyInfo.KeyChar == '"')
+                            {
+                                completedPath = true;
+                                args = new[] {path.ToString()};
+                            }
+                            else
+                                path.Append(keyInfo.KeyChar);
+                        }
+                    } while (!completedPath);
+                    Console.Clear();
                 }
 
                 Console.OutputEncoding = new UTF8Encoding(false);
@@ -71,7 +97,7 @@ namespace PsnPkgCheck
                 }
 
                 var longestFilename = Math.Max(pkgList.Max(i => i.Name.Length), HeaderPkgName.Length);
-                var sigWidth = Math.Max(HeaderSginature.Length, 8);
+                var sigWidth = Math.Max(HeaderSignature.Length, 8);
                 var csumWidth = Math.Max(HeaderChecksum.Length, 5);
                 var csumsWidth = 1 + sigWidth + 1 + csumWidth + 1;
                 var idealWidth = longestFilename + csumsWidth;
@@ -90,7 +116,7 @@ namespace PsnPkgCheck
                     Console.BufferHeight = Math.Max(Console.BufferHeight, Math.Min(9999, pkgList.Count + 10));
                 }
                 catch (PlatformNotSupportedException) { }
-                Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSginature.PadLeft(sigWidth)} {HeaderChecksum.PadLeft(csumWidth)}");
+                Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSignature.PadLeft(sigWidth)} {HeaderChecksum.PadLeft(csumWidth)}");
                 using var cts = new CancellationTokenSource();
                 Console.CancelKeyPress += (sender, eventArgs) => { cts.Cancel(); };
                 var t = new Thread(() =>
