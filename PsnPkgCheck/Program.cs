@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +11,7 @@ namespace PsnPkgCheck
 {
     internal static class Program
     {
-        private const string Title = "PSN PKG Validator v1.3.1";
+        private const string Title = "PSN PKG Validator v1.3.2";
         private const string HeaderPkgName = "Package name";
         private const string HeaderSignature = "Signature";
         private const string HeaderChecksum = "Checksum";
@@ -105,12 +106,15 @@ namespace PsnPkgCheck
                         longestFilename = Console.LargestWindowWidth - csumsWidth;
                         idealWidth = Console.LargestWindowWidth;
                     }
-                    if (idealWidth > Console.WindowWidth)
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        Console.BufferWidth = Math.Max(Console.BufferWidth, idealWidth);
-                        Console.WindowWidth = idealWidth;
+                        if (idealWidth > Console.WindowWidth)
+                        {
+                            Console.BufferWidth = Math.Max(Console.BufferWidth, idealWidth);
+                            Console.WindowWidth = idealWidth;
+                        }
+                        Console.BufferHeight = Math.Max(Console.BufferHeight, Math.Min(9999, pkgList.Count + 10));
                     }
-                    Console.BufferHeight = Math.Max(Console.BufferHeight, Math.Min(9999, pkgList.Count + 10));
                 }
                 catch (PlatformNotSupportedException) { }
                 Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSignature.PadLeft(sigWidth)} {HeaderChecksum.PadLeft(csumWidth)}");

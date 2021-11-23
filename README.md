@@ -23,11 +23,11 @@ PKG Validator presents result in two columns: `Signature` and `Checksum`.
 System Requirements
 ===================
 
-.NET Core 3.1 system prerequisites apply, see `Supported OS versions` and `.NET Core dependencies` sections in [documentation](https://docs.microsoft.com/en-us/dotnet/core/windows-prerequisites).
+.NET 6.0 system prerequisites apply, see `Supported OS versions` and `.NET Dependencies` sections in [documentation](https://docs.microsoft.com/en-us/dotnet/core/install/windows?tabs=net60#dependencies).
 
 How to build
 ============
 
 For developing and running this project you will need
-* .NET Core SDK 3.1 or newer
+* .NET Core SDK 6.0 or newer
 * any text editor, but Visual Studio or Visual Studio Code are recommended
