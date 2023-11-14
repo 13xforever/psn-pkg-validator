@@ -11,7 +11,7 @@ namespace PsnPkgCheck
 {
     internal static class Program
     {
-        private const string Title = "PSN PKG Validator v1.3.2";
+        private const string Title = "PSN PKG Validator v1.3.3";
         private const string HeaderPkgName = "Package name";
         private const string HeaderSignature = "Signature";
         private const string HeaderChecksum = "Checksum";
