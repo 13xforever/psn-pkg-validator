@@ -11,7 +11,7 @@ namespace PsnPkgCheck;
 
 internal static class Program
 {
-    private const string Title = "PSN PKG Validator v1.3.3";
+    private const string Title = "PSN PKG Validator v1.3.4";
     private const string HeaderPkgName = "Package name";
     private const string HeaderSignature = "Signature";
     private const string HeaderChecksum = "Checksum";
@@ -42,7 +42,7 @@ internal static class Program
     {
         try
         {
-            if (args.Length == 0)
+            if (args.Length is 0)
             {
                 Console.WriteLine("Drag .pkg files and/or folders onto this .exe to verify the packages.");
                 var isFirstChar = true;
@@ -88,7 +88,7 @@ internal static class Program
                     Console.WriteLine("Unknown path: " + path);
             }
             Console.ResetColor();
-            if (pkgList.Count == 0)
+            if (pkgList.Count is 0)
             {
                 Console.WriteLine("No packages were found. Check paths, and try again.");
                 return;
@@ -119,19 +119,20 @@ internal static class Program
             catch (PlatformNotSupportedException) { }
             Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSignature.PadLeft(sigWidth)} {HeaderChecksum.PadLeft(csumWidth)}");
             using var cts = new CancellationTokenSource();
+            var tkn = cts.Token;
             Console.CancelKeyPress += (sender, eventArgs) => { cts.Cancel(); };
             var t = new Thread(() =>
             {
                 try
                 {
                     var indicatorIdx = 0;
-                    while (!cts.Token.IsCancellationRequested)
+                    while (!tkn.IsCancellationRequested)
                     {
-                        Task.Delay(1000, cts.Token).ConfigureAwait(false).GetAwaiter().GetResult();
-                        if (cts.Token.IsCancellationRequested)
+                        Task.Delay(1000, tkn).ConfigureAwait(false).GetAwaiter().GetResult();
+                        if (tkn.IsCancellationRequested)
                             return;
 
-                        PkgChecker.Sync.Wait(cts.Token);
+                        PkgChecker.Sync.Wait(tkn);
                         try
                         {
                             var frame = Animation[(indicatorIdx++) % Animation.Length];
@@ -158,7 +159,7 @@ internal static class Program
                 }
             });
             t.Start();
-            await PkgChecker.CheckAsync(pkgList, longestFilename, sigWidth, csumWidth, csumsWidth-2, cts.Token).ConfigureAwait(false);
+            await PkgChecker.CheckAsync(pkgList, longestFilename, sigWidth, csumWidth, csumsWidth-2, tkn).ConfigureAwait(false);
             cts.Cancel(false);
             t.Join();
         }
@@ -179,7 +180,7 @@ internal static class Program
         {
             foundFiles = foundFiles.Concat(Directory.EnumerateFiles(rootPath, patternMatch));
         }
-        catch (Exception e) when (e is UnauthorizedAccessException || e is PathTooLongException)
+        catch (Exception e) when (e is UnauthorizedAccessException or PathTooLongException)
         {
             Console.WriteLine($"{rootPath}: {e.Message}");
         }
@@ -196,13 +197,13 @@ internal static class Program
                         var newFiles = GetFilePaths(dir, patternMatch, searchOption);
                         foundFiles = foundFiles.Concat(newFiles);
                     }
-                    catch (Exception e) when (e is UnauthorizedAccessException || e is PathTooLongException)
+                    catch (Exception e) when (e is UnauthorizedAccessException or PathTooLongException)
                     {
                         Console.WriteLine($"{dir}: {e.Message}");
                     }
                 }
             }
-            catch (Exception e) when (e is UnauthorizedAccessException || e is PathTooLongException)
+            catch (Exception e) when (e is UnauthorizedAccessException or PathTooLongException)
             {
                 Console.WriteLine($"{rootPath}: {e.Message}");
             }
