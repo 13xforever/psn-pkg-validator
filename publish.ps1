@@ -32,11 +32,11 @@ Get-ChildItem -LiteralPath distrib -Include *.pdb,*.config -Recurse | Remove-Ite
 Write-Host 'Zipping...' -ForegroundColor Cyan
 if (Test-Path -LiteralPath distrib/win/PsnPkgCheck.exe)
 {
-    Compress-Archive -LiteralPath distrib/win/PsnPkgCheck.exe -DestinationPath distrib/PsnPkgCheck-win-NEW.zip -CompressionLevel Optimal -Force
+    Compress-Archive -LiteralPath distrib/win/PsnPkgCheck.exe -DestinationPath distrib/PsnPkgCheck-win-x64-NEW.zip -CompressionLevel Optimal -Force
 }
 if (Test-Path -LiteralPath distrib/lin/PsnPkgCheck)
 {
-    Compress-Archive -LiteralPath distrib/lin/PsnPkgCheck -DestinationPath distrib/PsnPkgCheck-linux-NEW.zip -CompressionLevel Optimal -Force
+    Compress-Archive -LiteralPath distrib/lin/PsnPkgCheck -DestinationPath distrib/PsnPkgCheck-linux-x64-NEW.zip -CompressionLevel Optimal -Force
 }
 
 Write-Host 'Done' -ForegroundColor Cyan
