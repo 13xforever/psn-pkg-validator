@@ -19,6 +19,7 @@ public static class VshCrypto
     public static ReadOnlyECPointRef NpdrmQOld => CreateReadOnlyPointRef(NpdrmPubKeyOld);
     public static ReadOnlyECPointRef VshPubQ => CreateReadOnlyPointRef(VshPubKey);
     public static readonly byte[] Ps3GpkgKey = "2E7B71D7C9C9A14EA3221F188828B8F8".AsBytes();
+    public static readonly byte[] Ps3GpkgIDUKey = "5DB911E6B7E50A7D321538FD7C66F17B".AsBytes();
     public static Ecdsa VshCurve1 => CreateCurve(VshCurve1Data);
     public static Ecdsa VshCurve2 => CreateCurve(VshCurve2Data);
     public static Ecdsa VshInvCurve1 => CreateCurve(VshInvCurve1Data);
