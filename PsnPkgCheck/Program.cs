@@ -13,8 +13,10 @@ internal static class Program
 {
     private const string Title = "PSN PKG Validator v1.3.4";
     private const string HeaderPkgName = "Package name";
-    private const string HeaderSignature = "Signature";
-    private const string HeaderChecksum = "Checksum";
+    private const string HeaderSignature = "Header";
+    private const string MetaSignature = "Metadata";
+    private const string ContentSignature = "Content";
+    private const string PkgChecksum = "Package";
 
     private static readonly string[] Animation =
     [
@@ -95,9 +97,11 @@ internal static class Program
             }
 
             var longestFilename = Math.Max(pkgList.Max(i => i.Name.Length), HeaderPkgName.Length);
-            var sigWidth = Math.Max(HeaderSignature.Length, 8);
-            var csumWidth = Math.Max(HeaderChecksum.Length, 5);
-            var csumsWidth = 1 + sigWidth + 1 + csumWidth + 1;
+            var headerSigWidth = Math.Max(HeaderSignature.Length, 8);
+            var metaSigWidth = Math.Max(MetaSignature.Length, 8);
+            var dataSigWidth = Math.Max(ContentSignature.Length, 8);
+            var csumWidth = Math.Max(PkgChecksum.Length, 4);
+            var csumsWidth = 1 + headerSigWidth + 1 + metaSigWidth + 1 + /* dataSigWidth + 1 */ + csumWidth + 1;
             var idealWidth = longestFilename + csumsWidth;
             try
             {
@@ -117,7 +121,8 @@ internal static class Program
                 }
             }
             catch (PlatformNotSupportedException) { }
-            Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSignature.PadLeft(sigWidth)} {HeaderChecksum.PadLeft(csumWidth)}");
+            //Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSignature.PadLeft(headerSigWidth)} {MetaSignature.PadLeft(metaSigWidth)} {ContentSignature.PadLeft(dataSigWidth)} {PkgChecksum.PadLeft(csumWidth)}");
+            Console.WriteLine($"{HeaderPkgName.Trim(longestFilename).PadRight(longestFilename)} {HeaderSignature.PadLeft(headerSigWidth)} {MetaSignature.PadLeft(metaSigWidth)} {PkgChecksum.PadLeft(csumWidth)}");
             using var cts = new CancellationTokenSource();
             var tkn = cts.Token;
             Console.CancelKeyPress += (sender, eventArgs) => { cts.Cancel(); };
@@ -159,7 +164,7 @@ internal static class Program
                 }
             });
             t.Start();
-            await PkgChecker.CheckAsync(pkgList, longestFilename, sigWidth, csumWidth, csumsWidth-2, tkn).ConfigureAwait(false);
+            await PkgChecker.CheckAsync(pkgList, longestFilename, headerSigWidth, metaSigWidth, dataSigWidth, csumWidth, csumsWidth-2, tkn).ConfigureAwait(false);
             cts.Cancel(false);
             t.Join();
         }

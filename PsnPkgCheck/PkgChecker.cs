@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,7 +21,16 @@ public static class PkgChecker
     internal static int CurrentPadding { get; private set; }
     internal static readonly SemaphoreSlim Sync = new(1, 1);
 
-    internal static async Task CheckAsync(List<FileInfo> pkgList, int fnameWidth, int sigWidth, int csumWidth, int allCsumsWidth, CancellationToken cancellationToken)
+    internal static async Task CheckAsync(
+        List<FileInfo> pkgList,
+        int fnameWidth,
+        int headerSigWidth,
+        int metaSigWidth,
+        int dataSigWidth,
+        int csumWidth,
+        int allCsumsWidth,
+        CancellationToken cancellationToken
+    )
     {
         TotalFileSize = pkgList.Sum(i => i.Length);
 
@@ -29,7 +40,7 @@ public static class PkgChecker
             Write($"{item.Name.Trim(fnameWidth).PadRight(fnameWidth)} ");
             try
             {
-                CurrentPadding = sigWidth;
+                CurrentPadding = headerSigWidth;
                 CurrentFileSize = item.Length;
                 if (item.Length < 0xC0 + 0x20) // header + csum at the end
                 {
@@ -37,24 +48,56 @@ public static class PkgChecker
                     continue;
                 }
 
+                // header
                 await using var file = File.Open(item.FullName, FileMode.Open, FileAccess.Read, FileShare.Read);
-                var header = new byte[0xc0];
-                await file.ReadExactlyAsync(header.AsMemory(), cancellationToken).ConfigureAwait(false);
-                var sha1Sum = SHA1.HashData(header.AsSpan(0, 0x80));
-                if (!ValidateCmac(header))
-                    Write("cmac".PadLeft(sigWidth) + " ", ConsoleColor.Red);
-                else if (!ValidateHash(header, sha1Sum))
-                    Write("sha1".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
-                else if (!ValidateSigNew(header, sha1Sum))
+                var headerBuf = ArrayPool<byte>.Shared.Rent(0xc0);
+                await file.ReadExactlyAsync(headerBuf.AsMemory()[..0xc0], cancellationToken).ConfigureAwait(false);
+                var header = headerBuf.AsSpan()[..0xc0];
+                ValidateSection(header[..^0x40], header[^0x40..], headerSigWidth);
+
+                var metaOffset = BinaryPrimitives.ReadInt32BigEndian(header[0x08..0x0c]);
+                var metaSize = BinaryPrimitives.ReadInt32BigEndian(header[0x10..0x14]);
+                var totalSize = BinaryPrimitives.ReadInt64BigEndian(header[0x18..0x20]);
+                var dataOffset = BinaryPrimitives.ReadInt64BigEndian(header[0x20..0x28]);
+                var dataSize = BinaryPrimitives.ReadInt64BigEndian(header[0x28..0x30]);
+                ArrayPool<byte>.Shared.Return(headerBuf);
+
+                if (file.Length < totalSize)
                 {
-                    if (!ValidateSigOld(header, sha1Sum))
-                        Write("ecdsa".PadLeft(sigWidth) + " ", ConsoleColor.Red);
-                    else
-                        Write("ok (old)".PadLeft(sigWidth) + " ", ConsoleColor.Yellow);
+                    Write("size".PadLeft(metaSigWidth + 1 +csumWidth) + Environment.NewLine, ConsoleColor.Red);
+                    continue;
+                }
+
+                // metadata
+                var metaBuf = ArrayPool<byte>.Shared.Rent(metaSize);
+                file.Seek(metaOffset, SeekOrigin.Begin);
+                await file.ReadExactlyAsync(metaBuf.AsMemory()[..metaSize], cancellationToken).ConfigureAwait(false);
+                var meta = metaBuf.AsSpan()[..metaSize];
+                ValidateSection(meta[..^0x40], meta[^0x40..], metaSigWidth);
+                ArrayPool<byte>.Shared.Return(metaBuf);
+
+                // content (needs decryption)
+                /*
+                if (dataSize <= int.MaxValue)
+                {
+                    var dataBuf = ArrayPool<byte>.Shared.Rent((int)dataSize);
+                    var dataDigestBuf = ArrayPool<byte>.Shared.Rent(0x40);
+                    file.Seek(dataOffset, SeekOrigin.Begin);
+                    await file.ReadExactlyAsync(dataBuf.AsMemory()[..(int)dataSize], cancellationToken).ConfigureAwait(false);
+                    await file.ReadExactlyAsync(dataDigestBuf.AsMemory()[..0x40], cancellationToken).ConfigureAwait(false);
+                    var data = dataBuf.AsSpan()[..(int)dataSize];
+                    var digest = dataDigestBuf.AsSpan()[..0x40];
+                    ValidateSection(data, digest, dataSigWidth);
+                    ArrayPool<byte>.Shared.Return(dataBuf);
+                    ArrayPool<byte>.Shared.Return(dataDigestBuf);
                 }
                 else
-                    Write("ok".PadLeft(sigWidth) + " ", ConsoleColor.Green);
+                {
+                    Write("skipped".PadLeft(dataSigWidth)+" ", ConsoleColor.Yellow);
+                }
+                */
 
+                // pkg checksum
                 CurrentPadding = csumWidth;
                 file.Seek(0, SeekOrigin.Begin);
                 byte[] hash;
@@ -79,7 +122,7 @@ public static class PkgChecker
                 await file.ReadExactlyAsync(expectedHash.AsMemory(), cancellationToken).ConfigureAwait(false);
                 CurrentFileProcessedBytes += 0x20;
                 if (!expectedHash.SequenceEqual(hash))
-                    Write("fail".PadLeft(csumWidth) + Environment.NewLine, ConsoleColor.Red);
+                    Write("csum".PadLeft(csumWidth) + Environment.NewLine, ConsoleColor.Red);
                 else
                     Write("ok".PadLeft(csumWidth) + Environment.NewLine, ConsoleColor.Green);
             }
@@ -96,6 +139,24 @@ public static class PkgChecker
             if (cancellationToken.IsCancellationRequested)
                 return;
         }
+    }
+
+    private static void ValidateSection(in ReadOnlySpan<byte> data, in ReadOnlySpan<byte> pkgDigest, int headerSigWidth)
+    {
+        var sha1Sum = SHA1.HashData(data);
+        if (!ValidateCmac(data, pkgDigest))
+            Write("cmac".PadLeft(headerSigWidth) + " ", ConsoleColor.Red);
+        else if (!ValidateHash(pkgDigest, sha1Sum))
+            Write("sha1".PadLeft(headerSigWidth) + " ", ConsoleColor.Yellow);
+        else if (!ValidateSigNew(pkgDigest, sha1Sum))
+        {
+            if (!ValidateSigOld(pkgDigest, sha1Sum))
+                Write("ecdsa".PadLeft(headerSigWidth) + " ", ConsoleColor.Red);
+            else
+                Write("ok (old)".PadLeft(headerSigWidth) + " ", ConsoleColor.Yellow);
+        }
+        else
+            Write("ok".PadLeft(headerSigWidth) + " ", ConsoleColor.Green);
     }
 
     private static void Write(string str, ConsoleColor? color = null)
@@ -129,13 +190,13 @@ public static class PkgChecker
         return str[..maxLength];
     }
 
-    private static bool ValidateCmac(Span<byte> header)
+    private static bool ValidateCmac(in ReadOnlySpan<byte> data, in ReadOnlySpan<byte> pkgDigest)
     {
-        var actualCmac = GetCmac(header[..0x80], VshCrypto.Ps3GpkgKey);
-        return header[0x80..0x90].SequenceEqual(actualCmac);
+        var actualCmac = GetCmac(data, VshCrypto.Ps3GpkgKey);
+        return pkgDigest[..0x10].SequenceEqual(actualCmac);
     }
 
-    private static byte[] GetCmac(Span<byte> data, byte[] omacKey, bool truncate = true)
+    private static byte[] GetCmac(in ReadOnlySpan<byte> data, in byte[] omacKey, bool truncate = true)
     {
         if (omacKey is not {Length: 0x10})
             throw new ArgumentException(nameof(omacKey));
@@ -213,53 +274,18 @@ public static class PkgChecker
             return encResult.AsSpan(encResult.Length - 0x14, 0x14).ToArray();
     }
 
-    private static byte[] GetPs3Hmac(Span<byte> data)
+    private static bool ValidateSigNew(in ReadOnlySpan<byte> pkgDigest, in ReadOnlySpan<byte> hash)
     {
-        var sha = SHA1.HashData(data);
-        Span<byte> buf = stackalloc byte[0x40];
-        sha[4..12].CopyTo(buf);
-        sha[4..12].CopyTo(buf[8..]);
-        sha[12..16].CopyTo(buf[16..]);
-        buf[20] = sha[16];
-        sha[1..4].CopyTo(buf[21..]);
-        buf[16..24].CopyTo(buf[24..]);
-        sha = SHA1.HashData(buf);
-        return sha[0x00..0x10];
-    }
-
-    private static byte[] GetSha1Hmac(ReadOnlySpan<byte> data, ReadOnlySpan<byte> key)
-    {
-        if (key is not { Length: 0x40 })
-            throw new ArgumentException(nameof(key));
-
-        Span<byte> ipad = stackalloc byte[0x40];
-        Span<byte> tmp = stackalloc byte[0x40 + 0x14]; // opad + hash(ipad + message)
-        for (var i = 0; i < ipad.Length; i++)
-        {
-            tmp[i] = (byte)(key[i] ^ 0x5c); // opad
-            ipad[i] = (byte)(key[i] ^ 0x36);
-        }
-        using (var sha1 = SHA1.Create())
-        {
-            sha1.TransformBlock(ipad.ToArray(), 0, ipad.Length, null, 0);
-            sha1.TransformFinalBlock(data.ToArray(), 0, data.Length);
-            sha1.Hash!.AsSpan()[..0x14].CopyTo(tmp[0x40..]);
-        }
-        return SHA1.HashData(tmp);
-    }
-
-    private static bool ValidateSigNew(ReadOnlySpan<byte> header, ReadOnlySpan<byte> hash)
-    {
-        var rs = VshCrypto.CreateReadOnlyPointRef(header[0x90..0xb8]);
+        var rs = VshCrypto.CreateReadOnlyPointRef(pkgDigest[0x10..0x38]);
         return VshCrypto.VshInvCurve2.Verify(VshCrypto.NpdrmQ, rs, hash);
     }
 
-    private static bool ValidateSigOld(ReadOnlySpan<byte> header, ReadOnlySpan<byte> hash)
+    private static bool ValidateSigOld(in ReadOnlySpan<byte> pkgDigest, in ReadOnlySpan<byte> hash)
     {
-        var rs = VshCrypto.CreateReadOnlyPointRef(header[0x90..0xb8]);
+        var rs = VshCrypto.CreateReadOnlyPointRef(pkgDigest[0x10..0x38]);
         return VshCrypto.VshInvCurve2.Verify(VshCrypto.NpdrmQOld, rs, hash);
     }
 
-    private static bool ValidateHash(ReadOnlySpan<byte> header, ReadOnlySpan<byte> sha1)
-        => header[0xb8..0xc0].SequenceEqual(sha1[0x0c..0x14]);
+    private static bool ValidateHash(in ReadOnlySpan<byte> pkgDigest, in ReadOnlySpan<byte> sha1)
+        => pkgDigest[0x38..0x40].SequenceEqual(sha1[0x0c..0x14]);
 }
