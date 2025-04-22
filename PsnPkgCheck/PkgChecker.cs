@@ -193,8 +193,12 @@ public static class PkgChecker
     private static bool ValidateCmac(in ReadOnlySpan<byte> data, in ReadOnlySpan<byte> pkgDigest)
     {
         var actualCmac = GetCmac(data, VshCrypto.Ps3GpkgKey);
-        return pkgDigest[..0x10].SequenceEqual(actualCmac);
-    }
+        if (pkgDigest[..0x10].SequenceEqual(actualCmac))
+            return true;
+ 
+        var iduCmac = GetCmac(data, VshCrypto.Ps3GpkgIDUKey);
+        return pkgDigest[..0x10].SequenceEqual(iduCmac);
+     }
 
     private static byte[] GetCmac(in ReadOnlySpan<byte> data, in byte[] omacKey, bool truncate = true)
     {
