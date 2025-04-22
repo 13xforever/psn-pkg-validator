@@ -144,7 +144,8 @@ public static class PkgChecker
     private static void ValidateSection(in ReadOnlySpan<byte> data, in ReadOnlySpan<byte> pkgDigest, int headerSigWidth)
     {
         var sha1Sum = SHA1.HashData(data);
-        if (!ValidateCmac(data, pkgDigest))
+        var cmacMatch = ValidateCmac(data, pkgDigest);
+        if (cmacMatch is "")
             Write("cmac".PadLeft(headerSigWidth) + " ", ConsoleColor.Red);
         else if (!ValidateHash(pkgDigest, sha1Sum))
             Write("sha1".PadLeft(headerSigWidth) + " ", ConsoleColor.Yellow);
@@ -153,10 +154,20 @@ public static class PkgChecker
             if (!ValidateSigOld(pkgDigest, sha1Sum))
                 Write("ecdsa".PadLeft(headerSigWidth) + " ", ConsoleColor.Red);
             else
-                Write("ok (old)".PadLeft(headerSigWidth) + " ", ConsoleColor.Yellow);
+            {
+                if (cmacMatch is "idu")
+                    Write("idu (old)".PadLeft(headerSigWidth) + " ", ConsoleColor.Yellow);
+                else
+                    Write("ok (old)".PadLeft(headerSigWidth) + " ", ConsoleColor.Yellow);
+            }
         }
         else
-            Write("ok".PadLeft(headerSigWidth) + " ", ConsoleColor.Green);
+        {
+            if (cmacMatch is "idu")
+                Write("idu".PadLeft(headerSigWidth) + " ", ConsoleColor.Green);
+            else
+                Write("ok".PadLeft(headerSigWidth) + " ", ConsoleColor.Green);
+        }
     }
 
     private static void Write(string str, ConsoleColor? color = null)
@@ -190,15 +201,18 @@ public static class PkgChecker
         return str[..maxLength];
     }
 
-    private static bool ValidateCmac(in ReadOnlySpan<byte> data, in ReadOnlySpan<byte> pkgDigest)
+    private static string ValidateCmac(in ReadOnlySpan<byte> data, in ReadOnlySpan<byte> pkgDigest)
     {
         var actualCmac = GetCmac(data, VshCrypto.Ps3GpkgKey);
         if (pkgDigest[..0x10].SequenceEqual(actualCmac))
-            return true;
+            return "retail";
  
-        var iduCmac = GetCmac(data, VshCrypto.Ps3GpkgIDUKey);
-        return pkgDigest[..0x10].SequenceEqual(iduCmac);
-     }
+        var iduCmac = GetCmac(data, VshCrypto.Ps3GpkgIduKey);
+        if (pkgDigest[..0x10].SequenceEqual(iduCmac))
+            return "idu";
+
+        return "";
+    }
 
     private static byte[] GetCmac(in ReadOnlySpan<byte> data, in byte[] omacKey, bool truncate = true)
     {
