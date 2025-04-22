@@ -12,22 +12,34 @@ Alternatively if you prefer to run from console, just supply paths you want to c
 But what does it all mean?
 --------------------------
 
-PKG Validator presents result in two columns: `Signature` and `Checksum`.
+PKG Validator presents result in three columns: `Header`, `Metadata`, and `Package`.
 
-`Signature` validates if the PKG is authentic and was produced by Sony, it does this by calculating various security values that are present in the header structure. Most PKGs have several levels of layered protection that is designed to make sure that nothing was modified. Any result other than green `ok` means that the PKG wasn't made by Sony, and nothing more.
+`Header` and `Metadata` validate if the PKG is authentic and was produced by Sony,
+it does this by calculating various security values that are present in the
+file structure.
+Most PKGs have several levels of layered protection that are designed to make sure
+that nothing was modified. Any result other than green `ok` or yellow `idu` means
+that the PKG wasn't made by Sony, and nothing more.
 
-`Checksum` on the other hand is a simple full PKG file hash validation that tells if it was corrupted in the transfer or not. It does not care if the file was produced by Sony itself, or made with homebrew tools. You want this to be green `ok` for all your PKGs, always.
+`Package` on the other hand is a simple full file content hash validation
+that tells if it was corrupted in the transfer or not. It does not care
+if the file was produced by Sony itself, or made with homebrew tools.
+You want this to be green `ok` for all your PKGs, always.
 
-![Quick guide to results](https://user-images.githubusercontent.com/36445/49114564-52b17300-f2ba-11e8-9d8b-5ab567deff56.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./screenshots/dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="./screenshots/light.png">
+  <img alt="Quick guide to results" src="./screenshots/dark.png">
+</picture>
 
 System Requirements
 ===================
 
-.NET 6.0 system prerequisites apply, see `Supported OS versions` and `.NET Dependencies` sections in [documentation](https://docs.microsoft.com/en-us/dotnet/core/install/windows?tabs=net60#dependencies).
+.NET 9.0 system prerequisites apply, see `Supported OS versions` and `.NET Dependencies` sections in [documentation](https://learn.microsoft.com/en-us/dotnet/core/install/).
 
 How to build
 ============
 
 For developing and running this project you will need
-* .NET Core SDK 6.0 or newer
+* .NET Core SDK 9.0 or newer
 * any text editor, but Visual Studio or Visual Studio Code are recommended
