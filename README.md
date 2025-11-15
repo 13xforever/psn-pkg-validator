@@ -35,7 +35,7 @@ You want this to be green `ok` for all your PKGs, always.
 System Requirements
 ===================
 
-.NET 9.0 system prerequisites apply, see `Supported OS versions` and `.NET Dependencies` sections in [documentation](https://learn.microsoft.com/en-us/dotnet/core/install/).
+.NET 10.0 system prerequisites apply, see `Supported OS versions` and `.NET Dependencies` sections in [documentation](https://learn.microsoft.com/en-us/dotnet/core/install/).
 
 How to build
 ============

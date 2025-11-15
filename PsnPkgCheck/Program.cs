@@ -11,7 +11,7 @@ namespace PsnPkgCheck;
 
 internal static class Program
 {
-    private const string Title = "PSN PKG Validator v1.4.0";
+    private const string Title = "PSN PKG Validator v1.5.0";
     private const string HeaderPkgName = "Package name";
     private const string HeaderSignature = "Header";
     private const string MetaSignature = "Metadata";
@@ -183,14 +183,14 @@ internal static class Program
         var foundFiles = Enumerable.Empty<string>();
         try
         {
-            foundFiles = foundFiles.Concat(Directory.EnumerateFiles(rootPath, patternMatch));
+            foundFiles = Directory.EnumerateFiles(rootPath, patternMatch);
         }
         catch (Exception e) when (e is UnauthorizedAccessException or PathTooLongException)
         {
             Console.WriteLine($"{rootPath}: {e.Message}");
         }
 
-        if (searchOption == SearchOption.AllDirectories)
+        if (searchOption is SearchOption.AllDirectories)
         {
             try
             {

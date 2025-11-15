@@ -1,7 +1,7 @@
 #!/usr/bin/pwsh
 Clear-Host
 $trim = $true
-$target = "net9.0"
+$target = "net10.0"
 if ($PSVersionTable.PSVersion.Major -lt 6)
 {
     Write-Host 'Restarting using pwsh...'
